@@ -4,3 +4,4 @@ node_modules
 downloads
 auth
 .qodo
+package-lock.json
