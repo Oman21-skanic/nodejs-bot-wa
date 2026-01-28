@@ -8,7 +8,7 @@ const qrcode = require("qrcode-terminal")
 
 // ===== CONFIG =====
 const OWNER = "6288291045579@s.whatsapp.net"
-const TRIGGERS = ["yeayyy", "y", "apaa sekali lihat", "cantikk bilaa", "sekali liat wae", "apa coba sekali liat", "mau liat ah kepo"]
+const TRIGGERS = ["yeayyy", "y", "bentarr", "apaa sekali lihat", "cantikk bilaa", "sekali liat wae", "apa coba sekali liat", "mau liat ah kepo", "1", "2", "3","4","5","6","7","8","9","10"]
 
 // ===== UNWRAP VIEW-ONCE =====
 function unwrapMessage(msg) {
