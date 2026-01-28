@@ -4,20 +4,21 @@ const {
   downloadMediaMessage,
   DisconnectReason
 } = require("@whiskeysockets/baileys")
+
 const qrcode = require("qrcode-terminal")
 
-// ===== CONFIG =====
+// ================= CONFIG =================
 const OWNER = "6288291045579@s.whatsapp.net"
-const TRIGGERS = ["yeayyy", "y", "bentarr", "apaa sekali lihat", "cantikk bilaa", "sekali liat wae", "apa coba sekali liat", "mau liat ah kepo", "1", "2", "3","4","5","6","7","8","9","10"]
+const TARGET_LID = "247369195061455@lid" // LID TARGET (PASTIKAN BENAR)
 
-// ===== UNWRAP VIEW-ONCE =====
-function unwrapMessage(msg) {
-  let m = msg
+// =========================================
+function unwrapQuotedMessage(quoted) {
+  let m = quoted
   while (true) {
     if (!m) return null
     if (m.imageMessage || m.videoMessage) return m
-    if (m.viewOnceMessage) m = m.viewOnceMessage.message
-    else if (m.viewOnceMessageV2) m = m.viewOnceMessageV2.message
+    if (m.viewOnceMessageV2) m = m.viewOnceMessageV2.message
+    else if (m.viewOnceMessage) m = m.viewOnceMessage.message
     else if (m.ephemeralMessage) m = m.ephemeralMessage.message
     else return null
   }
@@ -25,10 +26,10 @@ function unwrapMessage(msg) {
 
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState("./auth")
+
   const sock = makeWASocket({
     auth: state,
-    browser: ["ViewOnce Bot", "Chrome", "1.0.0"],
-    printQRInTerminal: false
+    browser: ["Reply-VO Bot", "Chrome", "1.0.0"]
   })
 
   sock.ev.on("creds.update", saveCreds)
@@ -36,9 +37,11 @@ async function startBot() {
   // ===== CONNECTION =====
   sock.ev.on("connection.update", ({ connection, lastDisconnect, qr }) => {
     if (qr) qrcode.generate(qr, { small: true })
+
     if (connection === "open") {
       console.log("✅ BOT CONNECTED & READY")
     }
+
     if (connection === "close") {
       const code = lastDisconnect?.error?.output?.statusCode
       console.log("❌ DISCONNECTED:", code)
@@ -47,46 +50,40 @@ async function startBot() {
   })
 
   // ===== MESSAGE HANDLER =====
-  sock.ev.on("messages.upsert", async ({ messages }) => {
+  sock.ev.on("messages.upsert", async ({ messages, type }) => {
+    if (type !== "notify") return
+
     for (const msg of messages) {
       try {
         if (!msg.message) continue
-        if (msg.key.remoteJid === "status@broadcast") continue
 
-        const from = msg.key.remoteJid
-        const sender = msg.key.participant || from
-        const body =
-          msg.message.conversation ||
-          msg.message.extendedTextMessage?.text ||
-          ""
-
-        console.log("📩 MSG:", body)
-
-        // ===== TRIGGER REPLY "yeayyy" =====
-        if (!TRIGGERS.includes(body.toLowerCase())) continue
+        const jid = msg.key.remoteJid
+        if (jid !== TARGET_LID) continue
 
         const ctx = msg.message.extendedTextMessage?.contextInfo
-        if (!ctx?.quotedMessage) continue
+        if (!ctx?.quotedMessage) continue // ❌ bukan reply
 
-        console.log("⚡ REPLY VIEW-ONCE DETECTED")
+        console.log("⚡ REPLY DARI TARGET TERDETEKSI")
 
-        // ===== UNWRAP =====
-        const unwrapped = unwrapMessage(ctx.quotedMessage)
-        if (!unwrapped) throw new Error("Media tidak ditemukan")
+        const unwrapped = unwrapQuotedMessage(ctx.quotedMessage)
+        if (!unwrapped) {
+          console.log("⏭️ reply tapi bukan view-once")
+          continue
+        }
 
         const media = unwrapped.imageMessage || unwrapped.videoMessage
-        if (!media) throw new Error("Media tidak ditemukan")
+        if (!media?.mimetype) continue
 
-        const mediaKey = {
-          remoteJid: from,
-          fromMe: false,
-          id: ctx.stanzaId,
-          participant: ctx.participant
-        }
+        console.log("📸 VIEW-ONCE TERDETEKSI")
 
         const buffer = await downloadMediaMessage(
           {
-            key: mediaKey,
+            key: {
+              remoteJid: jid,
+              fromMe: false,
+              id: ctx.stanzaId,
+              participant: ctx.participant
+            },
             message: ctx.quotedMessage
           },
           "buffer",
@@ -94,16 +91,18 @@ async function startBot() {
           { reuploadRequest: sock.updateMediaMessage }
         )
 
-        const type = media.mimetype.startsWith("video") ? "video" : "image"
+        const typeMedia = media.mimetype.startsWith("video")
+          ? "video"
+          : "image"
 
         await sock.sendMessage(OWNER, {
-          [type]: buffer,
-          caption: "📥 View-once via reply"
+          [typeMedia]: buffer,
+          caption: "📥 Auto View-Once via Reply"
         })
 
-        console.log("✅ VIEW-ONCE TERKIRIM KE OWNER")
+        console.log("✅ VIEW-ONCE BERHASIL DI-DOWNLOAD")
       } catch (err) {
-        console.error("❌ HANDLER ERROR:", err.message || err)
+        console.error("❌ ERROR:", err.message || err)
       }
     }
   })
