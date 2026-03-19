@@ -1,6 +1,10 @@
 .env
 viewonce
 node_modules
+auth/
+*.db
+*.log
+.DS_Store
 downloads
 auth
 .qodo
