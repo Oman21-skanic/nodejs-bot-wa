@@ -3,6 +3,7 @@ const {
   default: makeWASocket,
   useMultiFileAuthState,
   downloadMediaMessage,
+  downloadContentFromMessage,
   DisconnectReason,
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
@@ -276,11 +277,11 @@ _Built by @oman21 for Personal Developer Use_`
             if (isImg || isVid) {
               const dlDir = path.join(__dirname, "downloads")
               if (!fs.existsSync(dlDir)) fs.mkdirSync(dlDir)
-              
-              const buffer = await downloadMediaMessage(
-                { key: { id: msg.message.extendedTextMessage.contextInfo.stanzaId, remoteJid: jid, participant: msg.message.extendedTextMessage.contextInfo.participant }, message: q }, 
-                "buffer", {}, { logger, reuploadRequest: sock.updateMediaMessage }
-              )
+              const stream = await downloadContentFromMessage(isImg || isVid, isImg ? "image" : "video")
+              let buffer = Buffer.from([])
+              for await (const chunk of stream) {
+                buffer = Buffer.concat([buffer, chunk])
+              }
               
               const ext = isImg ? "jpg" : "mp4"
               const filename = `${Date.now()}.${ext}`
@@ -307,7 +308,11 @@ _Built by @oman21 for Personal Developer Use_`
           const q = msg.message.extendedTextMessage?.contextInfo?.quotedMessage
           const unwrapped = unwrapQuotedMessage(q)
           if (unwrapped) {
-            const buffer = await downloadMediaMessage({ key: { remoteJid: jid, id: msg.message.extendedTextMessage.contextInfo.stanzaId, participant: msg.message.extendedTextMessage.contextInfo.participant }, message: q }, "buffer")
+            const stream = await downloadContentFromMessage(unwrapped.imageMessage || unwrapped.videoMessage, unwrapped.imageMessage ? "image" : "video")
+            let buffer = Buffer.from([])
+            for await (const chunk of stream) {
+              buffer = Buffer.concat([buffer, chunk])
+            }
             await sock.sendMessage(OWNER, { [unwrapped.imageMessage ? "image" : "video"]: buffer, caption: "👀 View-Once Target" })
           }
         }
