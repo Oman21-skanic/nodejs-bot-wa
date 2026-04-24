@@ -131,9 +131,20 @@ async function startBot() {
     if (up.qr) qrcode.generate(up.qr, { small: true })
     if (up.connection === "open") console.log("✅ BOT CONNECTED")
     if (up.connection === "close") {
-      const reconnect = (up.lastDisconnect?.error instanceof Boom) ? up.lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut : true
-      if (reconnect) setTimeout(startBot, 3000)
-      else process.exit(0)
+      const statusCode = (up.lastDisconnect?.error instanceof Boom) ? up.lastDisconnect.error.output.statusCode : 0
+      const shouldReconnect = statusCode !== DisconnectReason.loggedOut
+
+      console.log(`🔌 CONNECTION CLOSED: ${up.lastDisconnect?.error?.message || "Unknown reason"}. Reconnecting: ${shouldReconnect}`)
+
+      if (shouldReconnect) {
+        setTimeout(startBot, 3000)
+      } else {
+        console.log("🚨 LOGGED OUT. Clearing session and exiting...")
+        if (fs.existsSync("./auth")) {
+          fs.rmSync("./auth", { recursive: true, force: true })
+        }
+        process.exit(0)
+      }
     }
   })
 
@@ -321,4 +332,7 @@ _Built by @oman21 for Personal Developer Use_`
   })
 }
 
-startBot()
+startBot().catch(err => {
+  console.error("🔥 FATAL ERROR STARTING BOT:", err)
+  process.exit(1)
+})
